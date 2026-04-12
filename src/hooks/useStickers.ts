@@ -35,7 +35,8 @@ export function useStickers(albumId: string) {
         .from("stickers")
         .select("*")
         .eq("album_id", albumId)
-        .order("number");
+        .order("section")
+        .order("sort_order");
 
       // Busca o status do usuário para esse álbum
       const { data: userStatus } = await supabase

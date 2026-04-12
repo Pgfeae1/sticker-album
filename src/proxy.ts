@@ -1,7 +1,9 @@
+// src/proxy.ts
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+// ← nome da função mudou de "middleware" para "proxy"
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -25,14 +27,11 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // Renova a sessão do usuário se ainda for válida
   await supabase.auth.getUser();
 
   return supabaseResponse;
 }
 
-// Define em quais rotas o middleware vai rodar
-// Exclui arquivos estáticos e imagens para não impactar performance
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",

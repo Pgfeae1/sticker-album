@@ -1,9 +1,9 @@
+// src/hooks/useStickers.ts
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 
-// Tipos que representam os dados
 export type Sticker = {
   id: string;
   number: string;
@@ -16,21 +16,38 @@ export type Sticker = {
 
 export type FilterType = "todas" | "possuidas" | "faltando" | "repetidas";
 
-export function useStickers(albumId: string) {
+const LS_KEY = (userAlbumId: string) => `sticker-album:${userAlbumId}`;
+
+function readLS(
+  userAlbumId: string,
+): Record<string, { owned: boolean; quantity: number }> {
+  try {
+    const raw = localStorage.getItem(LS_KEY(userAlbumId));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLS(
+  userAlbumId: string,
+  data: Record<string, { owned: boolean; quantity: number }>,
+) {
+  localStorage.setItem(LS_KEY(userAlbumId), JSON.stringify(data));
+}
+
+export function useStickers(userAlbumId: string, albumId: string) {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     async function load() {
       setLoading(true);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Busca todas as figurinhas do álbum
+      // Lista de figurinhas do álbum (pública, igual para todos)
       const { data: allStickers } = await supabase
         .from("stickers")
         .select("*")
@@ -38,80 +55,141 @@ export function useStickers(albumId: string) {
         .order("section")
         .order("sort_order");
 
-      // Busca o status do usuário para esse álbum
-      const { data: userStatus } = await supabase
-        .from("user_stickers")
-        .select("*")
-        .eq("user_id", user.id);
+      if (!allStickers) {
+        setLoading(false);
+        return;
+      }
 
-      // Junta os dois: para cada figurinha, anexa o status do usuário
-      const statusMap = new Map(
-        userStatus?.map((s) => [s.sticker_id, s]) ?? [],
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let statusMap: Record<string, { owned: boolean; quantity: number }> = {};
+
+      if (user) {
+        // Logado: carrega do Supabase usando o user_album_id
+        const { data: userStatus } = await supabase
+          .from("user_stickers")
+          .select("*")
+          .eq("user_album_id", userAlbumId);
+
+        statusMap = Object.fromEntries(
+          (userStatus ?? []).map((s) => [
+            s.sticker_id,
+            { owned: s.owned, quantity: s.quantity },
+          ]),
+        );
+
+        // Mescla com localStorage se houver dados locais não salvos
+        const local = readLS(userAlbumId);
+        for (const [id, val] of Object.entries(local)) {
+          if (!statusMap[id] || val.quantity > statusMap[id].quantity) {
+            statusMap[id] = val;
+          }
+        }
+      } else {
+        // Não logado: só localStorage
+        statusMap = readLS(userAlbumId);
+      }
+
+      setStickers(
+        allStickers.map((s) => ({
+          id: s.id,
+          number: s.number,
+          section: s.section,
+          player_name: s.player_name,
+          team: s.team,
+          owned: statusMap[s.id]?.owned ?? false,
+          quantity: statusMap[s.id]?.quantity ?? 0,
+        })),
       );
 
-      const merged: Sticker[] = (allStickers ?? []).map((s) => ({
-        id: s.id,
-        number: s.number,
-        section: s.section,
-        player_name: s.player_name,
-        team: s.team,
-        owned: statusMap.get(s.id)?.owned ?? false,
-        quantity: statusMap.get(s.id)?.quantity ?? 0,
-      }));
-
-      setStickers(merged);
       setLoading(false);
     }
 
     load();
-  }, [albumId]);
+  }, [userAlbumId, albumId]);
 
-  // Função para marcar/desmarcar ou adicionar repetidas
   const updateSticker = useCallback(
     async (stickerId: string, action: "toggle" | "add" | "remove") => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      setStickers((prev) => {
+        const current = prev.find((s) => s.id === stickerId);
+        if (!current) return prev;
 
-      const current = stickers.find((s) => s.id === stickerId);
-      if (!current) return;
+        let newOwned = current.owned;
+        let newQty = current.quantity;
 
-      let newOwned = current.owned;
-      let newQty = current.quantity;
+        if (action === "toggle") {
+          newOwned = !current.owned;
+          newQty = newOwned ? 1 : 0;
+        } else if (action === "add") {
+          newOwned = true;
+          newQty = current.quantity + 1;
+        } else if (action === "remove") {
+          newQty = Math.max(0, current.quantity - 1);
+          newOwned = newQty > 0;
+        }
 
-      if (action === "toggle") {
-        newOwned = !current.owned;
-        newQty = newOwned ? 1 : 0;
-      } else if (action === "add") {
-        newOwned = true;
-        newQty = current.quantity + 1;
-      } else if (action === "remove") {
-        newQty = Math.max(0, current.quantity - 1);
-        newOwned = newQty > 0;
-      }
-
-      // Upsert = insere se não existe, atualiza se já existe
-      await supabase.from("user_stickers").upsert(
-        {
-          user_id: user.id,
-          sticker_id: stickerId,
-          owned: newOwned,
-          quantity: newQty,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,sticker_id" },
-      );
-
-      // Atualiza o estado local imediatamente (sem precisar recarregar a página)
-      setStickers((prev) =>
-        prev.map((s) =>
+        const updated = prev.map((s) =>
           s.id === stickerId ? { ...s, owned: newOwned, quantity: newQty } : s,
-        ),
-      );
+        );
+
+        // Salva snapshot no localStorage
+        const snapshot: Record<string, { owned: boolean; quantity: number }> =
+          {};
+        updated.forEach((s) => {
+          if (s.owned || s.quantity > 0)
+            snapshot[s.id] = { owned: s.owned, quantity: s.quantity };
+        });
+        writeLS(userAlbumId, snapshot);
+
+        return updated;
+      });
     },
-    [stickers, supabase],
+    [userAlbumId],
   );
 
-  return { stickers, loading, updateSticker };
+  const saveToSupabase = useCallback(async (): Promise<
+    "saved" | "not-logged"
+  > => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return "not-logged";
+
+    setIsSaving(true);
+
+    const toSave = stickers
+      .filter((s) => s.owned || s.quantity > 0)
+      .map((s) => ({
+        user_id: user.id,
+        user_album_id: userAlbumId,
+        sticker_id: s.id,
+        owned: s.owned,
+        quantity: s.quantity,
+        updated_at: new Date().toISOString(),
+      }));
+
+    if (toSave.length > 0) {
+      await supabase
+        .from("user_stickers")
+        .upsert(toSave, { onConflict: "user_album_id,sticker_id" });
+    }
+
+    localStorage.removeItem(LS_KEY(userAlbumId));
+    setIsSaving(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+
+    return "saved";
+  }, [stickers, userAlbumId, supabase]);
+
+  return {
+    stickers,
+    loading,
+    isSaving,
+    saveSuccess,
+    updateSticker,
+    saveToSupabase,
+  };
 }

@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useStickers, type FilterType } from "@/hooks/useStickers";
 import { StickerCard } from "./StickerCard";
+import { SaveDialog } from "./SaveDialog";
 
 const FILTROS: { value: FilterType; label: string }[] = [
   { value: "todas", label: "Todas" },
@@ -11,12 +12,32 @@ const FILTROS: { value: FilterType; label: string }[] = [
   { value: "repetidas", label: "Repetidas" },
 ];
 
-export function StickerGrid({ albumId }: { albumId: string }) {
-  const { stickers, loading, updateSticker } = useStickers(albumId);
+export function StickerGrid({
+  userAlbumId,
+  albumId,
+}: {
+  userAlbumId: string;
+  albumId: string;
+}) {
+  const {
+    stickers,
+    loading,
+    isSaving,
+    saveSuccess,
+    updateSticker,
+    saveToSupabase,
+  } = useStickers(userAlbumId, albumId);
   const [filtro, setFiltro] = useState<FilterType>("todas");
   const [busca, setBusca] = useState("");
+  const [showDialog, setShowDialog] = useState(false);
 
-  // Filtra e agrupa as figurinhas
+  async function handleSave() {
+    const result = await saveToSupabase();
+    if (result === "not-logged") {
+      setShowDialog(true);
+    }
+  }
+
   const agrupadas = useMemo(() => {
     const filtradas = stickers
       .filter((s) => {
@@ -35,7 +56,6 @@ export function StickerGrid({ albumId }: { albumId: string }) {
         );
       });
 
-    // Agrupa por seção
     return filtradas.reduce<Record<string, typeof filtradas>>((acc, s) => {
       acc[s.section] = acc[s.section] ?? [];
       acc[s.section].push(s);
@@ -57,14 +77,44 @@ export function StickerGrid({ albumId }: { albumId: string }) {
 
   return (
     <div>
-      {/* Barra de progresso */}
+      {/* Barra de progresso + botão salvar */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="font-medium text-slate-700">
-            {possuidas} de {total} figurinhas
-          </span>
-          <span className="font-bold text-green-600">{progresso}%</span>
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <span className="font-medium text-slate-700">
+              {possuidas} de {total} figurinhas
+            </span>
+            <span className="font-bold text-green-600 ml-3">{progresso}%</span>
+          </div>
+
+          {/* Botão salvar */}
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`
+              flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium
+              transition-all duration-200
+              ${
+                saveSuccess
+                  ? "bg-green-500 text-white"
+                  : "bg-slate-800 text-white hover:bg-slate-700 active:scale-95"
+              }
+              ${isSaving ? "opacity-60 cursor-not-allowed" : ""}
+            `}
+          >
+            {isSaving ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Salvando...
+              </>
+            ) : saveSuccess ? (
+              <>✓ Salvo!</>
+            ) : (
+              <>💾 Salvar progresso</>
+            )}
+          </button>
         </div>
+
         <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-green-500 rounded-full transition-all duration-500"
@@ -73,7 +123,7 @@ export function StickerGrid({ albumId }: { albumId: string }) {
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Filtros + busca */}
       <div className="flex flex-wrap gap-2 mb-4">
         {FILTROS.map((f) => (
           <button
@@ -89,8 +139,6 @@ export function StickerGrid({ albumId }: { albumId: string }) {
             {f.label}
           </button>
         ))}
-
-        {/* Barra de busca */}
         <input
           type="text"
           placeholder="Buscar figurinha..."
@@ -125,6 +173,9 @@ export function StickerGrid({ albumId }: { albumId: string }) {
           Nenhuma figurinha encontrada para esse filtro.
         </p>
       )}
+
+      {/* Pop-up de conta */}
+      <SaveDialog open={showDialog} onClose={() => setShowDialog(false)} />
     </div>
   );
 }

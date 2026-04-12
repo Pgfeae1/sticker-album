@@ -1,8 +1,6 @@
-// src/proxy.ts
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// ← nome da função mudou de "middleware" para "proxy"
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -27,6 +25,7 @@ export async function proxy(request: NextRequest) {
     },
   );
 
+  // Apenas renova a sessão — sem redirecionar ninguém
   await supabase.auth.getUser();
 
   return supabaseResponse;

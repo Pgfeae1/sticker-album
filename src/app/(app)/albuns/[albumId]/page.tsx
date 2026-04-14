@@ -41,9 +41,7 @@ export default async function AlbumPage({ params }: Props) {
           ← Meus álbuns
         </Link>
         <span className="text-slate-300">|</span>
-        <span className="text-sm text-slate-800 font-medium">
-          {customName}
-        </span>
+        <span className="text-sm text-slate-800 font-medium">{customName}</span>
       </div>
 
       <div className="mb-6">

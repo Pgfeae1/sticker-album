@@ -54,8 +54,7 @@ export function StickerGrid({
         return (
           s.number.toLowerCase().includes(q) ||
           s.player_name?.toLowerCase().includes(q) ||
-          s.section.toLowerCase().includes(q) ||
-          s.team?.toLowerCase().includes(q)
+          s.section.toLowerCase().includes(q)
         );
       });
 
@@ -144,7 +143,7 @@ export function StickerGrid({
         ))}
         <input
           type="text"
-          placeholder="Buscar figurinha, jogador, seção ou time..."
+          placeholder="Buscar figurinha..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           className="flex-1 min-w-[180px] px-4 py-1.5 rounded-full text-sm border border-slate-200 focus:outline-none focus:border-slate-400"

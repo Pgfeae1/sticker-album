@@ -115,6 +115,13 @@ export default function RegistroPage() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Criando conta..." : "Criar conta"}
           </Button>
+          <button
+            type="button"
+            onClick={() => router.push("/albuns")}
+            className="w-full text-sm text-slate-400 hover:text-slate-600 transition-colors py-1"
+          >
+            Cancelar
+          </button>
         </form>
       </CardContent>
     </Card>

@@ -31,13 +31,18 @@ export default async function AlbumPage({ params }: Props) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-        <Link href="/albuns" className="hover:text-slate-800 transition-colors">
-          Meus álbuns
+      <div className="flex items-center gap-4 mb-6">
+        <Link
+          href="/albuns"
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 
+                    bg-white border border-slate-200 hover:border-slate-400 
+                    px-3 py-1.5 rounded-full transition-all"
+        >
+          ← Meus álbuns
         </Link>
-        <span>›</span>
-        <span className="text-slate-800 font-medium">
-          {isLocal ? "Álbum local" : customName}
+        <span className="text-slate-300">|</span>
+        <span className="text-sm text-slate-800 font-medium">
+          {customName}
         </span>
       </div>
 

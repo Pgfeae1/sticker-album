@@ -1,11 +1,10 @@
-// src/hooks/useStickers.ts
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase-browser";
 
 export type Sticker = {
-  id: string;
+  id: number; // Integer ID
   number: string;
   section: string;
   player_name: string | null;
@@ -16,91 +15,97 @@ export type Sticker = {
 
 export type FilterType = "todas" | "possuidas" | "faltando" | "repetidas";
 
-const LS_KEY = (userAlbumId: string) => `sticker-album:${userAlbumId}`;
+const LS_ALBUMS_KEY = "sticker-albums:list";
 
-function readLS(
-  userAlbumId: string,
-): Record<string, { owned: boolean; quantity: number }> {
+function readLocalAlbumData(userAlbumId: string): Record<string, number> {
   try {
-    const raw = localStorage.getItem(LS_KEY(userAlbumId));
-    return raw ? JSON.parse(raw) : {};
+    const raw = localStorage.getItem(LS_ALBUMS_KEY);
+    if (!raw) return {};
+    const albums = JSON.parse(raw);
+    const album = albums.find((a: { id: string }) => a.id === userAlbumId);
+    return album?.stickers_data ?? {};
   } catch {
     return {};
   }
 }
 
-function writeLS(
+function writeLocalAlbumData(
   userAlbumId: string,
-  data: Record<string, { owned: boolean; quantity: number }>,
+  data: Record<string, number>,
 ) {
-  localStorage.setItem(LS_KEY(userAlbumId), JSON.stringify(data));
+  try {
+    const raw = localStorage.getItem(LS_ALBUMS_KEY);
+    const albums = raw ? JSON.parse(raw) : [];
+    const updated = albums.map((a: { id: string }) =>
+      a.id === userAlbumId ? { ...a, stickers_data: data } : a,
+    );
+    localStorage.setItem(LS_ALBUMS_KEY, JSON.stringify(updated));
+  } catch {}
 }
 
-export function useStickers(userAlbumId: string, albumId: string) {
+export function useStickers(
+  userAlbumId: string,
+  albumId: string,
+  isLocal: boolean,
+) {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Instância do cliente Supabase
   const supabase = createClient();
+
+  const stickersDataRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     async function load() {
       setLoading(true);
 
-      // Lista de figurinhas do álbum (pública, igual para todos)
       const { data: allStickers } = await supabase
         .from("stickers")
         .select("*")
         .eq("album_id", albumId)
         .order("section")
-        .order("sort_order");
+        .order("id");
 
       if (!allStickers) {
         setLoading(false);
         return;
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      let stickersData: Record<string, number> = {};
 
-      let statusMap: Record<string, { owned: boolean; quantity: number }> = {};
+      if (isLocal) {
+        stickersData = readLocalAlbumData(userAlbumId);
+      } else {
+        const { data: userAlbum } = await supabase
+          .from("user_albums")
+          .select("stickers_data")
+          .eq("id", userAlbumId)
+          .single();
 
-      if (user) {
-        // Logado: carrega do Supabase usando o user_album_id
-        const { data: userStatus } = await supabase
-          .from("user_stickers")
-          .select("*")
-          .eq("user_album_id", userAlbumId);
+        stickersData = userAlbum?.stickers_data ?? {};
 
-        statusMap = Object.fromEntries(
-          (userStatus ?? []).map((s) => [
-            s.sticker_id,
-            { owned: s.owned, quantity: s.quantity },
-          ]),
-        );
-
-        // Mescla com localStorage se houver dados locais não salvos
-        const local = readLS(userAlbumId);
-        for (const [id, val] of Object.entries(local)) {
-          if (!statusMap[id] || val.quantity > statusMap[id].quantity) {
-            statusMap[id] = val;
+        const localData = readLocalAlbumData(userAlbumId);
+        for (const [id, qty] of Object.entries(localData)) {
+          if (!stickersData[id] || qty > stickersData[id]) {
+            stickersData[id] = qty;
           }
         }
-      } else {
-        // Não logado: só localStorage
-        statusMap = readLS(userAlbumId);
       }
+
+      stickersDataRef.current = stickersData;
 
       setStickers(
         allStickers.map((s) => ({
-          id: s.id,
+          id: s.id, // Recebe como number do banco
           number: s.number,
           section: s.section,
           player_name: s.player_name,
           team: s.team,
-          owned: statusMap[s.id]?.owned ?? false,
-          quantity: statusMap[s.id]?.quantity ?? 0,
+          owned: (stickersData[s.id] ?? 0) > 0,
+          quantity: stickersData[s.id] ?? 0,
         })),
       );
 
@@ -108,40 +113,37 @@ export function useStickers(userAlbumId: string, albumId: string) {
     }
 
     load();
-  }, [userAlbumId, albumId]);
+    // A adição do 'supabase' aqui causou o erro no Hot Reload.
+    // O refresh (F5) resolve o problema de tamanho do array.
+  }, [userAlbumId, albumId, isLocal, supabase]);
 
   const updateSticker = useCallback(
-    async (stickerId: string, action: "toggle" | "add" | "remove") => {
+    (stickerId: number, action: "toggle" | "add" | "remove") => {
       setStickers((prev) => {
         const current = prev.find((s) => s.id === stickerId);
         if (!current) return prev;
 
-        let newOwned = current.owned;
         let newQty = current.quantity;
-
-        if (action === "toggle") {
-          newOwned = !current.owned;
-          newQty = newOwned ? 1 : 0;
-        } else if (action === "add") {
-          newOwned = true;
-          newQty = current.quantity + 1;
-        } else if (action === "remove") {
+        if (action === "toggle") newQty = current.owned ? 0 : 1;
+        else if (action === "add") newQty = current.quantity + 1;
+        else if (action === "remove")
           newQty = Math.max(0, current.quantity - 1);
-          newOwned = newQty > 0;
-        }
 
         const updated = prev.map((s) =>
-          s.id === stickerId ? { ...s, owned: newOwned, quantity: newQty } : s,
+          s.id === stickerId
+            ? { ...s, owned: newQty > 0, quantity: newQty }
+            : s,
         );
 
-        // Salva snapshot no localStorage
-        const snapshot: Record<string, { owned: boolean; quantity: number }> =
-          {};
-        updated.forEach((s) => {
-          if (s.owned || s.quantity > 0)
-            snapshot[s.id] = { owned: s.owned, quantity: s.quantity };
-        });
-        writeLS(userAlbumId, snapshot);
+        const newData = { ...stickersDataRef.current };
+        if (newQty > 0) {
+          newData[stickerId] = newQty; // Number vira string no JSON automaticamente
+        } else {
+          delete newData[stickerId];
+        }
+
+        stickersDataRef.current = newData;
+        writeLocalAlbumData(userAlbumId, newData);
 
         return updated;
       });
@@ -159,30 +161,17 @@ export function useStickers(userAlbumId: string, albumId: string) {
 
     setIsSaving(true);
 
-    const toSave = stickers
-      .filter((s) => s.owned || s.quantity > 0)
-      .map((s) => ({
-        user_id: user.id,
-        user_album_id: userAlbumId,
-        sticker_id: s.id,
-        owned: s.owned,
-        quantity: s.quantity,
-        updated_at: new Date().toISOString(),
-      }));
+    await supabase
+      .from("user_albums")
+      .update({ stickers_data: stickersDataRef.current })
+      .eq("id", userAlbumId);
 
-    if (toSave.length > 0) {
-      await supabase
-        .from("user_stickers")
-        .upsert(toSave, { onConflict: "user_album_id,sticker_id" });
-    }
-
-    localStorage.removeItem(LS_KEY(userAlbumId));
     setIsSaving(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
 
     return "saved";
-  }, [stickers, userAlbumId, supabase]);
+  }, [userAlbumId, supabase]);
 
   return {
     stickers,

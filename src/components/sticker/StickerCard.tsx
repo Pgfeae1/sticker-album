@@ -5,7 +5,10 @@ import type { Sticker } from "@/hooks/useStickers";
 
 type Props = {
   sticker: Sticker;
-  onUpdate: (id: string, action: "toggle" | "add" | "remove") => Promise<void>;
+  onUpdate: (
+    id: number,
+    action: "toggle" | "add" | "remove",
+  ) => void | Promise<void>;
 };
 
 export function StickerCard({ sticker, onUpdate }: Props) {

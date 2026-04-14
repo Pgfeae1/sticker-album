@@ -1,114 +1,114 @@
+// src/components/album/AlbumList.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase-browser";
+import { useUserAlbums } from "@/hooks/useUserAlbums";
+import { SaveDialog } from "@/components/sticker/SaveDialog";
 
-type UserAlbum = {
-  id: string;
-  custom_name: string;
-  created_at: string;
-};
+const ALBUM_ID = "a1b2c3d4-0000-0000-0000-000000000001";
 
-type Props = {
-  userAlbums: UserAlbum[];
-  isLoggedIn: boolean;
-  albumId: string;
-};
-
-export function AlbumList({ userAlbums: initial, isLoggedIn, albumId }: Props) {
+export function AlbumList({ isLoggedIn }: { isLoggedIn: boolean }) {
   const router = useRouter();
-  const supabase = createClient();
-  const [userAlbums, setUserAlbums] = useState<UserAlbum[]>(initial);
+  const {
+    userAlbums,
+    loading,
+    isSyncing,
+    createAlbum,
+    renameAlbum,
+    deleteAlbum,
+    syncToSupabase,
+  } = useUserAlbums(ALBUM_ID);
+
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [newName, setNewName] = useState("Meu álbum");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [showNameModal, setShowNameModal] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   const atLimit = userAlbums.length >= 5;
+  const hasLocalAlbums = userAlbums.some((a) => a.isLocal);
 
-  // Cria novo álbum pessoal
   async function handleCreate() {
-    if (!isLoggedIn) {
-      router.push("/registro");
-      return;
-    }
-    if (atLimit) return;
     setShowNameModal(true);
     setNewName("Meu álbum");
   }
 
   async function confirmCreate() {
     setCreating(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("user_albums")
-      .insert({
-        user_id: user.id,
-        album_id: albumId,
-        custom_name: newName.trim() || "Meu álbum",
-      })
-      .select()
-      .single();
-
-    if (!error && data) {
-      setUserAlbums((prev) => [...prev, data]);
-      setShowNameModal(false);
-      router.push(`/albuns/${data.id}`);
-    }
+    const album = await createAlbum(newName.trim() || "Meu álbum");
+    setShowNameModal(false);
     setCreating(false);
+    router.push(`/albuns/${album.id}`);
   }
 
-  // Renomeia álbum
   async function handleRename(id: string) {
-    await supabase
-      .from("user_albums")
-      .update({ custom_name: editName.trim() || "Meu álbum" })
-      .eq("id", id);
-
-    setUserAlbums((prev) =>
-      prev.map((a) =>
-        a.id === id ? { ...a, custom_name: editName.trim() || "Meu álbum" } : a,
-      ),
-    );
+    await renameAlbum(id, editName.trim() || "Meu álbum");
     setEditingId(null);
   }
 
-  // Deleta álbum pessoal
   async function handleDelete(id: string) {
     if (!confirm("Tem certeza? Isso vai apagar todo o progresso desse álbum."))
       return;
     setDeleting(id);
-    await supabase.from("user_albums").delete().eq("id", id);
-    setUserAlbums((prev) => prev.filter((a) => a.id !== id));
+    await deleteAlbum(id);
     setDeleting(null);
+  }
+
+  async function handleSync() {
+    const result = await syncToSupabase();
+    if (result === "not-logged") setShowSaveDialog(true);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-slate-400 animate-pulse">Carregando álbuns...</p>
+      </div>
+    );
   }
 
   return (
     <div>
-      {/* Grid de álbuns */}
+      {/* Banner de sincronização — aparece se tiver álbuns locais e estiver logado */}
+      {hasLocalAlbums && isLoggedIn && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+          <p className="text-sm text-amber-700">
+            Você tem álbuns salvos apenas neste dispositivo.
+          </p>
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="text-sm font-medium bg-amber-500 text-white px-4 py-1.5 rounded-full hover:bg-amber-600 disabled:opacity-60 whitespace-nowrap"
+          >
+            {isSyncing ? "Sincronizando..." : "☁️ Salvar na nuvem"}
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {userAlbums.map((ua) => (
           <div
             key={ua.id}
             className="relative bg-white border-2 border-slate-200 rounded-xl p-5 hover:border-slate-300 hover:shadow-sm transition-all"
           >
-            {/* Clica no card para abrir */}
             <div
               className="cursor-pointer"
               onClick={() =>
                 editingId !== ua.id && router.push(`/albuns/${ua.id}`)
               }
             >
-              <div className="text-4xl mb-3">📖</div>
+              <div className="flex items-start justify-between mb-3">
+                <span className="text-4xl">📖</span>
+                {ua.isLocal && (
+                  <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                    local
+                  </span>
+                )}
+              </div>
 
-              {/* Nome editável */}
               {editingId === ua.id ? (
                 <div
                   className="flex gap-2"
@@ -129,7 +129,7 @@ export function AlbumList({ userAlbums: initial, isLoggedIn, albumId }: Props) {
                     onClick={() => handleRename(ua.id)}
                     className="text-xs bg-slate-800 text-white px-3 py-1 rounded-lg"
                   >
-                    Salvar
+                    Ok
                   </button>
                 </div>
               ) : (
@@ -141,9 +141,13 @@ export function AlbumList({ userAlbums: initial, isLoggedIn, albumId }: Props) {
               <p className="text-xs text-slate-400 mt-1">
                 Copa do Mundo FIFA 2026
               </p>
+
+              {/* Mini progresso */}
+              <p className="text-xs text-slate-500 mt-2">
+                {Object.keys(ua.stickers_data).length} figurinhas possuídas
+              </p>
             </div>
 
-            {/* Ações */}
             {editingId !== ua.id && (
               <div className="flex gap-2 mt-4 pt-3 border-t border-slate-100">
                 <button
@@ -171,28 +175,19 @@ export function AlbumList({ userAlbums: initial, isLoggedIn, albumId }: Props) {
           </div>
         ))}
 
-        {/* Card de criar novo álbum */}
+        {/* Card criar novo */}
         {!atLimit && (
           <button
             onClick={handleCreate}
-            disabled={creating}
             className="border-2 border-dashed border-slate-300 rounded-xl p-5 text-slate-400
               hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50
               transition-all flex flex-col items-center justify-center gap-2 min-h-[160px]"
           >
             <span className="text-3xl">+</span>
-            <span className="text-sm font-medium">
-              {isLoggedIn ? "Novo álbum" : "Criar álbum"}
-            </span>
-            {!isLoggedIn && (
-              <span className="text-xs text-center leading-tight">
-                (cria conta gratuitamente)
-              </span>
-            )}
+            <span className="text-sm font-medium">Novo álbum</span>
           </button>
         )}
 
-        {/* Aviso de limite */}
         {atLimit && (
           <div
             className="border-2 border-dashed border-amber-200 rounded-xl p-5 bg-amber-50
@@ -200,16 +195,16 @@ export function AlbumList({ userAlbums: initial, isLoggedIn, albumId }: Props) {
           >
             <span className="text-3xl">🔒</span>
             <span className="text-sm font-medium text-amber-700">
-              Limite atingido
+              Limite de 5 atingido
             </span>
             <span className="text-xs text-amber-600 text-center">
-              Você já tem 5 álbuns. Apague um para criar outro.
+              Apague um álbum para criar outro.
             </span>
           </div>
         )}
       </div>
 
-      {/* Modal de nome do novo álbum */}
+      {/* Modal nome */}
       {showNameModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
@@ -217,8 +212,7 @@ export function AlbumList({ userAlbums: initial, isLoggedIn, albumId }: Props) {
               Nome do álbum
             </h3>
             <p className="text-sm text-slate-500 mb-4">
-              Dê um nome para identificar esse álbum. Ex: Meu álbum, Álbum do
-              João, etc.
+              Ex: Meu álbum, Álbum do João
             </p>
             <input
               autoFocus
@@ -244,12 +238,17 @@ export function AlbumList({ userAlbums: initial, isLoggedIn, albumId }: Props) {
                 disabled={creating}
                 className="flex-1 bg-slate-800 text-white rounded-xl py-2.5 text-sm hover:bg-slate-700 disabled:opacity-60"
               >
-                {creating ? "Criando..." : "Criar álbum"}
+                {creating ? "Criando..." : "Criar"}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <SaveDialog
+        open={showSaveDialog}
+        onClose={() => setShowSaveDialog(false)}
+      />
     </div>
   );
 }

@@ -15,9 +15,11 @@ const FILTROS: { value: FilterType; label: string }[] = [
 export function StickerGrid({
   userAlbumId,
   albumId,
+  isLocal,
 }: {
   userAlbumId: string;
   albumId: string;
+  isLocal: boolean;
 }) {
   const {
     stickers,
@@ -26,7 +28,7 @@ export function StickerGrid({
     saveSuccess,
     updateSticker,
     saveToSupabase,
-  } = useStickers(userAlbumId, albumId);
+  } = useStickers(userAlbumId, albumId, isLocal);
   const [filtro, setFiltro] = useState<FilterType>("todas");
   const [busca, setBusca] = useState("");
   const [showDialog, setShowDialog] = useState(false);

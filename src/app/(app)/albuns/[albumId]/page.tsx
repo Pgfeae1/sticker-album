@@ -40,15 +40,13 @@ export default async function AlbumPage({ params }: Props) {
         >
           ← Meus álbuns
         </Link>
-        <span className="text-slate-300">|</span>
-        <span className="text-sm text-slate-800 font-medium">{customName}</span>
       </div>
 
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-slate-800">
           {isLocal ? "Álbum local" : customName}
         </h2>
-        <p className="text-slate-500 mt-1">Copa do Mundo FIFA 2026 · 2026</p>
+        <p className="text-slate-500 mt-1">Copa do Mundo FIFA 2026</p>
       </div>
 
       <StickerGrid

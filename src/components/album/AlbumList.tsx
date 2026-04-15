@@ -21,7 +21,7 @@ export function AlbumList({ isLoggedIn }: { isLoggedIn: boolean }) {
   } = useUserAlbums(ALBUM_ID);
 
   const [showNameModal, setShowNameModal] = useState(false);
-  const [newName, setNewName] = useState("Meu álbum");
+  const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -33,7 +33,7 @@ export function AlbumList({ isLoggedIn }: { isLoggedIn: boolean }) {
 
   async function handleCreate() {
     setShowNameModal(true);
-    setNewName("Meu álbum");
+    setNewName("");
   }
 
   async function confirmCreate() {

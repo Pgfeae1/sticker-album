@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import { StickerGrid } from "@/components/sticker/StickerGrid";
+import { LocalAlbumTitle } from "@/components/album/LocalAlbumTitle";
 import Link from "next/link";
 
 type Props = {
@@ -22,9 +23,7 @@ export default async function AlbumPage({ params }: Props) {
       .eq("id", userAlbumId)
       .single();
 
-    if (!userAlbum) {
-      // Álbum não encontrado no banco — pode ser local, continua normalmente
-    } else {
+    if (userAlbum) {
       customName = userAlbum.custom_name;
     }
   }
@@ -43,9 +42,11 @@ export default async function AlbumPage({ params }: Props) {
       </div>
 
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">
-          {isLocal ? "Álbum local" : customName}
-        </h2>
+        {isLocal ? (
+          <LocalAlbumTitle albumId={userAlbumId} />
+        ) : (
+          <h2 className="text-2xl font-bold text-slate-800">{customName}</h2>
+        )}
         <p className="text-slate-500 mt-1">Copa do Mundo FIFA 2026</p>
       </div>
 

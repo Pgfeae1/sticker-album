@@ -29,14 +29,114 @@ export function StickerGrid({
     updateSticker,
     saveToSupabase,
   } = useStickers(userAlbumId, albumId, isLocal);
+
   const [filtro, setFiltro] = useState<FilterType>("todas");
   const [busca, setBusca] = useState("");
   const [showDialog, setShowDialog] = useState(false);
+  // Grupos retraídos: Set com os nomes das seções retraídas
+  const [gruposRetraidos, setGruposRetraidos] = useState<Set<string>>(
+    new Set(),
+  );
+  // Estado do modal de compartilhamento
+  const [shareModal, setShareModal] = useState<{
+    open: boolean;
+    tipo: "faltantes" | "repetidas" | null;
+    texto: string;
+  }>({ open: false, tipo: null, texto: "" });
+  // Feedback de cópia
+  const [copiado, setCopiado] = useState(false);
 
   async function handleSave() {
     const result = await saveToSupabase();
     if (result === "not-logged") {
       setShowDialog(true);
+    }
+  }
+
+  // Alterna retrair/expandir um grupo
+  function toggleGrupo(secao: string) {
+    setGruposRetraidos((prev) => {
+      const novo = new Set(prev);
+      if (novo.has(secao)) {
+        novo.delete(secao);
+      } else {
+        novo.add(secao);
+      }
+      return novo;
+    });
+  }
+
+  // Ao pesquisar, reseta os grupos retraídos
+  function handleBusca(valor: string) {
+    setBusca(valor);
+    if (valor.trim()) {
+      setGruposRetraidos(new Set());
+    }
+  }
+
+  // Gera o texto de compartilhamento
+  function gerarTextoCompartilhamento(tipo: "faltantes" | "repetidas"): string {
+    const siteUrl =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "https://seusite.com";
+
+    if (tipo === "faltantes") {
+      const faltantes = stickers
+        .filter((s) => !s.owned)
+        .map((s) => s.number)
+        .join(", ");
+
+      return (
+        `Minhas figurinhas faltantes:\n` +
+        `${faltantes || "Nenhuma faltante!"}\n\n` +
+        `Gerencie o seu álbum também pelo site: ${siteUrl}`
+      );
+    } else {
+      const repetidas = stickers
+        .filter((s) => s.quantity > 1)
+        .map((s) => `${s.number}: ${s.quantity - 1}`)
+        .join(", ");
+
+      return (
+        `Minhas figurinhas repetidas:\n` +
+        `${repetidas || "Nenhuma repetida!"}\n\n` +
+        `Gerencie o seu álbum também pelo site: ${siteUrl}`
+      );
+    }
+  }
+
+  function abrirShareModal(tipo: "faltantes" | "repetidas") {
+    const texto = gerarTextoCompartilhamento(tipo);
+    setShareModal({ open: true, tipo, texto });
+    setCopiado(false);
+  }
+
+  async function copiarTexto() {
+    try {
+      await navigator.clipboard.writeText(shareModal.texto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch {
+      // fallback para browsers sem clipboard API
+      const el = document.createElement("textarea");
+      el.value = shareModal.texto;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    }
+  }
+
+  async function compartilharNativo() {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: shareModal.texto });
+      } catch {
+        // usuário cancelou ou não suportado
+      }
     }
   }
 
@@ -125,6 +225,26 @@ export function StickerGrid({
         </div>
       </div>
 
+      {/* Botões de compartilhamento */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => abrirShareModal("faltantes")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium
+            border border-slate-200 bg-white text-slate-600
+            hover:border-slate-400 hover:text-slate-800 transition-all"
+        >
+          📤 Compartilhar faltantes
+        </button>
+        <button
+          onClick={() => abrirShareModal("repetidas")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium
+            border border-slate-200 bg-white text-slate-600
+            hover:border-slate-400 hover:text-slate-800 transition-all"
+        >
+          🔁 Compartilhar repetidas
+        </button>
+      </div>
+
       {/* Filtros + busca */}
       <div className="flex flex-wrap gap-2 mb-4">
         {FILTROS.map((f) => (
@@ -145,35 +265,129 @@ export function StickerGrid({
           type="text"
           placeholder="Buscar figurinha..."
           value={busca}
-          onChange={(e) => setBusca(e.target.value)}
+          onChange={(e) => handleBusca(e.target.value)}
           className="flex-1 min-w-[180px] px-4 py-1.5 rounded-full text-sm border border-slate-200 focus:outline-none focus:border-slate-400"
         />
       </div>
 
       {/* Grade por seção */}
-      {Object.entries(agrupadas).map(([secao, items]) => (
-        <div key={secao} className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-              {secao}
-            </h3>
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs text-slate-400">
-              {items.filter((s) => s.owned).length}/{items.length}
-            </span>
+      {Object.entries(agrupadas).map(([secao, items]) => {
+        const retraido = gruposRetraidos.has(secao);
+        return (
+          <div key={secao} className="mb-8">
+            {/* Cabeçalho do grupo — clicável para retrair */}
+            <button
+              onClick={() => toggleGrupo(secao)}
+              className="w-full flex items-center gap-3 mb-3 group"
+            >
+              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider group-hover:text-slate-700 transition-colors">
+                {secao}
+              </h3>
+              <div className="flex-1 h-px bg-slate-200" />
+              <span className="text-xs text-slate-400">
+                {items.filter((s) => s.owned).length}/{items.length}
+              </span>
+              {/* Ícone de retrair/expandir */}
+              <span
+                className={`text-slate-400 group-hover:text-slate-600 transition-all duration-200 text-xs ${
+                  retraido ? "rotate-0" : "rotate-180"
+                }`}
+                style={{ display: "inline-block" }}
+              >
+                ▲
+              </span>
+            </button>
+
+            {/* Grid de figurinhas — some quando retraído */}
+            {!retraido && (
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+                {items.map((s) => (
+                  <StickerCard
+                    key={s.id}
+                    sticker={s}
+                    onUpdate={updateSticker}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-            {items.map((s) => (
-              <StickerCard key={s.id} sticker={s} onUpdate={updateSticker} />
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       {Object.keys(agrupadas).length === 0 && (
         <p className="text-center text-slate-400 py-16">
           Nenhuma figurinha encontrada para esse filtro.
         </p>
+      )}
+
+      {/* Modal de compartilhamento */}
+      {shareModal.open && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setShareModal({ open: false, tipo: null, texto: "" })}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-bold text-slate-800 text-lg mb-1">
+              {shareModal.tipo === "faltantes"
+                ? "📤 Figurinhas faltantes"
+                : "🔁 Figurinhas repetidas"}
+            </h3>
+            <p className="text-sm text-slate-500 mb-3">
+              Copie o texto abaixo para compartilhar
+            </p>
+
+            {/* Texto gerado */}
+            <textarea
+              readOnly
+              value={shareModal.texto}
+              rows={8}
+              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5
+                bg-slate-50 text-slate-700 resize-none focus:outline-none focus:border-slate-400
+                font-mono leading-relaxed"
+            />
+
+            {/* Botões de ação */}
+            <div className="flex gap-2 mt-4">
+              {/* Botão copiar */}
+              <button
+                onClick={copiarTexto}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all
+                  ${
+                    copiado
+                      ? "bg-green-500 text-white"
+                      : "bg-slate-800 text-white hover:bg-slate-700"
+                  }`}
+              >
+                {copiado ? "✓ Copiado!" : "📋 Copiar texto"}
+              </button>
+
+              {/* Botão compartilhar nativo (aparece só se suportado) */}
+              {typeof navigator !== "undefined" &&
+                typeof navigator.share === "function" && (
+                  <button
+                    onClick={compartilharNativo}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-slate-200
+                    text-slate-600 hover:border-slate-400 hover:text-slate-800 transition-all"
+                  >
+                    🔗 Compartilhar
+                  </button>
+                )}
+            </div>
+
+            {/* Fechar */}
+            <button
+              onClick={() =>
+                setShareModal({ open: false, tipo: null, texto: "" })
+              }
+              className="w-full mt-2 text-sm text-slate-400 hover:text-slate-600 py-1"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Pop-up de conta */}

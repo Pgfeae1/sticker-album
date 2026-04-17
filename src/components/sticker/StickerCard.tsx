@@ -29,7 +29,8 @@ export function StickerCard({ sticker, onUpdate }: Props) {
       onClick={() => handle("toggle")}
       className={`
         relative rounded-xl border-2 p-2 cursor-pointer select-none
-        transition-all duration-150 active:scale-95
+        transition-colors duration-150
+        flex flex-col
         ${
           sticker.owned
             ? "bg-green-50 border-green-400"
@@ -43,8 +44,8 @@ export function StickerCard({ sticker, onUpdate }: Props) {
         {sticker.number}
       </p>
 
-      {/* Nome */}
-      <p className="text-xs font-medium text-slate-700 mt-1 leading-tight line-clamp-2 min-h-[2rem]">
+      {/* Nome — clamp 2 linhas, altura mínima fixa para consistência */}
+      <p className="text-xs font-medium text-slate-700 mt-1 leading-tight line-clamp-2 min-h-[2rem] flex-1">
         {sticker.player_name ?? sticker.section}
       </p>
 
@@ -55,29 +56,29 @@ export function StickerCard({ sticker, onUpdate }: Props) {
         </span>
       )}
 
-      {/* Controles de repetida — só aparecem quando possuída */}
-      {sticker.owned && (
-        <div
-          className="flex items-center justify-between mt-2 pt-1 border-t border-green-200"
-          onClick={(e) => e.stopPropagation()}
+      {/* Controles — SEMPRE renderizados para manter altura constante.
+          Quando não possuída: invisible (ocupa espaço mas não aparece).
+          Quando possuída: visível com borda verde. */}
+      <div
+        className={`flex items-center justify-between mt-2 pt-1 border-t ${
+          sticker.owned ? "border-green-200" : "border-transparent invisible"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={(e) => handle("remove", e)}
+          className="w-5 h-5 rounded text-slate-500 hover:bg-slate-100 text-xs font-bold flex items-center justify-center"
         >
-          <button
-            onClick={(e) => handle("remove", e)}
-            className="w-5 h-5 rounded text-slate-500 hover:bg-slate-100 text-xs font-bold flex items-center justify-center"
-          >
-            −
-          </button>
-          <span className="text-[11px] text-slate-500">
-            {sticker.quantity}×
-          </span>
-          <button
-            onClick={(e) => handle("add", e)}
-            className="w-5 h-5 rounded text-slate-500 hover:bg-slate-100 text-xs font-bold flex items-center justify-center"
-          >
-            +
-          </button>
-        </div>
-      )}
+          −
+        </button>
+        <span className="text-[11px] text-slate-500">{sticker.quantity}×</span>
+        <button
+          onClick={(e) => handle("add", e)}
+          className="w-5 h-5 rounded text-slate-500 hover:bg-slate-100 text-xs font-bold flex items-center justify-center"
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }

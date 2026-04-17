@@ -1,11 +1,9 @@
-// src/components/album/AlbumList.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUserAlbums } from "@/hooks/useUserAlbums";
 import { SaveDialog } from "@/components/sticker/SaveDialog";
-import { sanitizeAlbumName } from "@/lib/sanitize";
 
 const ALBUM_ID = "a1b2c3d4-0000-0000-0000-000000000001";
 
@@ -39,17 +37,14 @@ export function AlbumList({ isLoggedIn }: { isLoggedIn: boolean }) {
 
   async function confirmCreate() {
     setCreating(true);
-    // Sanitiza o nome antes de salvar
-    const safeName = sanitizeAlbumName(newName);
-    const album = await createAlbum(safeName);
+    const album = await createAlbum(newName.trim() || "Meu álbum");
     setShowNameModal(false);
     setCreating(false);
     router.push(`/albuns/${album.id}`);
   }
 
   async function handleRename(id: string) {
-    const safeName = sanitizeAlbumName(editName);
-    await renameAlbum(id, safeName);
+    await renameAlbum(id, editName.trim() || "Meu álbum");
     setEditingId(null);
   }
 
@@ -76,7 +71,7 @@ export function AlbumList({ isLoggedIn }: { isLoggedIn: boolean }) {
 
   return (
     <div>
-      {/* Banner de sincronização */}
+      {/* Banner de sincronização — aparece se tiver álbuns locais e estiver logado */}
       {hasLocalAlbums && isLoggedIn && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
           <p className="text-sm text-amber-700">
@@ -146,6 +141,7 @@ export function AlbumList({ isLoggedIn }: { isLoggedIn: boolean }) {
                 Copa do Mundo FIFA 2026
               </p>
 
+              {/* Mini progresso */}
               <p className="text-xs text-slate-500 mt-2">
                 {Object.keys(ua.stickers_data).length} figurinhas possuídas
               </p>
@@ -192,7 +188,10 @@ export function AlbumList({ isLoggedIn }: { isLoggedIn: boolean }) {
         )}
 
         {atLimit && (
-          <div className="border-2 border-dashed border-amber-200 rounded-xl p-5 bg-amber-50 flex flex-col items-center justify-center gap-2 min-h-[160px]">
+          <div
+            className="border-2 border-dashed border-amber-200 rounded-xl p-5 bg-amber-50
+            flex flex-col items-center justify-center gap-2 min-h-[160px]"
+          >
             <span className="text-3xl">🔒</span>
             <span className="text-sm font-medium text-amber-700">
               Limite de 5 atingido

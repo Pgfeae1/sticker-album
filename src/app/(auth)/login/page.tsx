@@ -14,46 +14,41 @@ import {
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
 
-  // Se já estiver logado, vai para os álbuns
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) router.replace("/albuns");
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleGoogleLogin() {
     setErro("");
     setLoading(true);
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/albuns`,
       },
     });
-
     if (error) {
       setErro(error.message);
       setLoading(false);
     }
-    // Sucesso: Supabase redireciona automaticamente → não precisamos fazer nada
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Entrar</CardTitle>
+        <CardTitle>Entrar na conta</CardTitle>
         <CardDescription>
-          Entre com sua conta Google para salvar e sincronizar seu álbum em
-          qualquer dispositivo.
+          Acesse com Google para sincronizar seus álbuns em qualquer
+          dispositivo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Botão Google */}
         <button
           type="button"
           onClick={handleGoogleLogin}
@@ -70,7 +65,7 @@ export default function LoginPage() {
           ) : (
             <GoogleIcon />
           )}
-          {loading ? "Redirecionando..." : "Continuar com Google"}
+          {loading ? "Redirecionando para o Google..." : "Continuar com Google"}
         </button>
 
         {erro && (
@@ -79,19 +74,28 @@ export default function LoginPage() {
           </p>
         )}
 
-        <p className="text-xs text-slate-400 text-center">
-          Ao entrar, você concorda que seus dados de álbum serão salvos na
-          nuvem.
-        </p>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-white px-2 text-xs text-slate-400">ou</span>
+          </div>
+        </div>
 
-        {/* Voltar sem entrar */}
         <button
           type="button"
           onClick={() => router.push("/albuns")}
-          className="w-full text-sm text-slate-400 hover:text-slate-600 transition-colors py-1"
+          className="w-full text-sm text-slate-500 hover:text-slate-700
+            border border-slate-200 rounded-xl py-2.5
+            hover:bg-slate-50 transition-colors"
         >
           Continuar sem conta
         </button>
+
+        <p className="text-center text-xs text-slate-400">
+          Sem conta? O Google cria uma automaticamente no primeiro acesso.
+        </p>
       </CardContent>
     </Card>
   );

@@ -22,7 +22,6 @@ export function SaveDialog({ open, onClose }: Props) {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        // Volta para a mesma página do álbum após o login
         redirectTo: `${window.location.origin}${window.location.pathname}`,
       },
     });
@@ -32,17 +31,17 @@ export function SaveDialog({ open, onClose }: Props) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Entre para salvar</DialogTitle>
+          <DialogTitle>Entre com Google para salvar</DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-3 pt-1">
               <p>
-                Seu progresso está salvo neste navegador. Para acessá-lo em
-                outros dispositivos, entre com o Google.
+                Seu progresso está salvo neste navegador, mas para acessá-lo em
+                outros dispositivos você precisa entrar com sua conta Google.
               </p>
               <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-600 space-y-1">
                 <p>✓ Acesse seu álbum em qualquer dispositivo</p>
-                <p>✓ Progresso nunca se perde</p>
-                <p>✓ Login rápido — sem senha</p>
+                <p>✓ Seu progresso nunca se perde</p>
+                <p>✓ Login rápido — sem senha para lembrar</p>
               </div>
             </div>
           </DialogDescription>
@@ -50,6 +49,7 @@ export function SaveDialog({ open, onClose }: Props) {
 
         <div className="flex flex-col gap-2 mt-2">
           <button
+            type="button"
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-3
               border border-slate-300 rounded-xl py-3 px-4
@@ -62,6 +62,7 @@ export function SaveDialog({ open, onClose }: Props) {
           </button>
 
           <button
+            type="button"
             onClick={onClose}
             className="text-sm text-slate-400 hover:text-slate-600 text-center mt-1"
           >

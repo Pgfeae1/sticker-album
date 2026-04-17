@@ -17,10 +17,10 @@ export default async function AppLayout({
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           {/* Logo */}
-          <Link href="/albuns" className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="text-2xl">⚽</span>
             <span className="font-bold text-slate-800">Meu Álbum</span>
-          </Link>
+          </div>
 
           {/* Área do usuário */}
           <div className="flex items-center gap-3">
@@ -29,16 +29,12 @@ export default async function AppLayout({
                 {user.user_metadata?.avatar_url && (
                   <img
                     src={user.user_metadata.avatar_url as string}
-                    alt={
-                      (user.user_metadata?.full_name as string) ??
-                      user.email ??
-                      "usuário"
-                    }
-                    className="w-7 h-7 rounded-full hidden sm:block"
+                    alt={user.user_metadata?.full_name ?? ""}
+                    className="w-7 h-7 rounded-full hidden sm:block object-cover"
                     referrerPolicy="no-referrer"
                   />
                 )}
-                <span className="text-sm text-slate-500 hidden sm:block max-w-[160px] truncate">
+                <span className="text-sm text-slate-500 hidden sm:block max-w-[180px] truncate">
                   {(user.user_metadata?.full_name as string) ?? user.email}
                 </span>
                 <LogoutButton />
@@ -51,7 +47,7 @@ export default async function AppLayout({
                   px-3 py-1.5 rounded-full hover:bg-slate-50
                   transition-colors shadow-sm"
               >
-                <GoogleIconSmall />
+                <GoogleIcon />
                 Entrar com Google
               </Link>
             )}
@@ -64,7 +60,7 @@ export default async function AppLayout({
   );
 }
 
-function GoogleIconSmall() {
+function GoogleIcon() {
   return (
     <svg
       width="16"

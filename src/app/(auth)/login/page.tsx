@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
 
+  // Se já estiver logado, vai para os álbuns
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) router.replace("/albuns");
@@ -39,8 +40,7 @@ export default function LoginPage() {
       setErro(error.message);
       setLoading(false);
     }
-    // Se OK: o Supabase redireciona ao Google e depois retorna para /albuns.
-    // Não chamamos setLoading(false) aqui — a página vai ser redirecionada.
+    // Sucesso: Supabase redireciona automaticamente → não precisamos fazer nada
   }
 
   return (
@@ -48,12 +48,12 @@ export default function LoginPage() {
       <CardHeader>
         <CardTitle>Entrar</CardTitle>
         <CardDescription>
-          Acesse com sua conta Google para sincronizar seus álbuns em qualquer
-          dispositivo.
+          Entre com sua conta Google para salvar e sincronizar seu álbum em
+          qualquer dispositivo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* ── Botão Google ─────────────────────────────────────────── */}
+        {/* Botão Google */}
         <button
           type="button"
           onClick={handleGoogleLogin}
@@ -79,6 +79,11 @@ export default function LoginPage() {
           </p>
         )}
 
+        <p className="text-xs text-slate-400 text-center">
+          Ao entrar, você concorda que seus dados de álbum serão salvos na
+          nuvem.
+        </p>
+
         {/* Voltar sem entrar */}
         <button
           type="button"
@@ -99,6 +104,7 @@ function GoogleIcon() {
       height="18"
       viewBox="0 0 18 18"
       xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
     >
       <path
         d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908C16.658 14.251 17.64 11.943 17.64 9.2z"

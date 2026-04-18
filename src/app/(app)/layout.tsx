@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import LogoutButton from "@/components/auth/LogoutButton";
+import { AuthRefresher } from "@/components/auth/AuthRefresher";
 import Link from "next/link";
 
 export default async function AppLayout({
@@ -14,6 +15,9 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* AuthRefresher é invisível — só chama router.refresh() no login/logout */}
+      <AuthRefresher />
+
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           {/* Logo */}
@@ -23,20 +27,37 @@ export default async function AppLayout({
           </div>
 
           {/* Área do usuário */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {user ? (
               <>
-                {user.user_metadata?.avatar_url && (
+                {/* Avatar — visível em todos os tamanhos */}
+                {user.user_metadata?.avatar_url ? (
                   <img
                     src={user.user_metadata.avatar_url as string}
-                    alt={user.user_metadata?.full_name ?? ""}
-                    className="w-7 h-7 rounded-full hidden sm:block object-cover"
+                    alt={(user.user_metadata?.full_name as string) ?? "Usuário"}
+                    className="w-7 h-7 rounded-full object-cover flex-shrink-0"
                     referrerPolicy="no-referrer"
                   />
+                ) : (
+                  /* Fallback: inicial do nome/email quando não há avatar */
+                  <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-slate-600">
+                      {(
+                        (user.user_metadata?.full_name as string) ??
+                        user.email ??
+                        "?"
+                      )
+                        .charAt(0)
+                        .toUpperCase()}
+                    </span>
+                  </div>
                 )}
-                <span className="text-sm text-slate-500 hidden sm:block max-w-[180px] truncate">
+
+                {/* Nome — oculto em mobile, visível em sm+ */}
+                <span className="hidden sm:block text-sm text-slate-500 max-w-[180px] truncate">
                   {(user.user_metadata?.full_name as string) ?? user.email}
                 </span>
+
                 <LogoutButton />
               </>
             ) : (
@@ -48,7 +69,9 @@ export default async function AppLayout({
                   transition-colors shadow-sm"
               >
                 <GoogleIcon />
-                Entrar com Google
+                {/* Texto encurtado no mobile */}
+                <span className="hidden sm:inline">Entrar com Google</span>
+                <span className="sm:hidden">Entrar</span>
               </Link>
             )}
           </div>
